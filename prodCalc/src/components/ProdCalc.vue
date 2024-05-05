@@ -5,83 +5,190 @@
         <h1>Product Cost Calc</h1>
       </div>
 
-      <el-button type="primary" :icon="ShoppingCart" />
+      <el-button type="primary" :icon="ShoppingCart" @click="openCart" /> 
+      <el-dialog v-model="cartVisible" title="Cart" width="500" center>
+
+        <el-table v-show="cartItems.length > 0" :data="cartItems" border>
+          <el-table-column prop="name" label="Product Name"></el-table-column>
+          <el-table-column prop="quantity" label="Quantity"></el-table-column>
+          <el-table-column prop="cost" label="Cost"></el-table-column>
+        </el-table>
+
+        <div v-show="cartItems.length > 0" class="total-cost">
+          Total Cost: {{ totalCost }}
+        </div>
+
+        <div v-show="!(cartItems.length > 0)" class="empty-cart">
+          Cart is empty
+        </div>
+
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="closeCart">Cancel</el-button>
+            <el-button v-show="cartItems.length > 0" type="primary" @click="closeCart">
+              Order
+            </el-button>
+          </div>
+        </template>
+      </el-dialog>
+
     </el-header>
 
     <el-main class="card">
 
       <section class="dropdown-section">
         <div class="dropdown-wrapper">
-          <label class="c-label">Choose category</label>
-          <el-dropdown @command="handleCommand">
+          <el-dropdown @command="handleCategoryChange">
             <span class="dropdown-link">
-              Dropdown List<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              <label v-if="!selectedCategory" class="c-label">Choose category</label>
+              <label v-else class="c-label">{{selectedCategory}}</label>
+              <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
-              <el-dropdown-menu class="dropdown-menu">
-                <el-dropdown-item command="a">Action 1</el-dropdown-item>
-                <el-dropdown-item command="b">Action 2</el-dropdown-item>
-                <el-dropdown-item command="c">Action 3</el-dropdown-item>
-                <el-dropdown-item command="d" disabled>Action 4</el-dropdown-item>
-                <el-dropdown-item command="e" divided>Action 5</el-dropdown-item>
-              </el-dropdown-menu>
+            <el-dropdown-menu class="dropdown-menu">
+              <el-dropdown-item v-for="(category, index) in Object.keys(products)" :key="index" :command="category">{{ category }}</el-dropdown-item>
+            </el-dropdown-menu>
             </template>
           </el-dropdown>
         </div>   
 
-        <div v-show="true" class="dropdown-wrapper">
-          <label class="c-label">Choose product</label>
-          <el-dropdown @command="handleCommand">
+        <div v-if="selectedCategory" class="dropdown-wrapper">
+          <el-dropdown @command="selectedProduct = $event">
             <span class="dropdown-link">
-              Dropdown List<el-icon class="el-icon--right"><arrow-down /></el-icon>
+              <label v-if="!selectedProduct" class="c-label">Choose product</label>
+              <label v-else class="c-label">{{selectedProduct.name}}</label>
+              <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
-              <el-dropdown-menu class="dropdown-menu">
-                <el-dropdown-item command="a">Action 1</el-dropdown-item>
-                <el-dropdown-item command="b">Action 2</el-dropdown-item>
-                <el-dropdown-item command="c">Action 3</el-dropdown-item>
-                <el-dropdown-item command="d" disabled>Action 4</el-dropdown-item>
-                <el-dropdown-item command="e" divided>Action 5</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
+            <el-dropdown-menu class="dropdown-menu">
+              <el-dropdown-item v-for="product in products[selectedCategory]" :key="product.name" :command="product">{{ product.name }}</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
           </el-dropdown>
         </div>  
       </section>
     
-      <section class="product-details">
+      <section class="product-details" v-if="selectedProduct">
         <div class="image-wrapper">
-          <img class="product-image" src="../assets/birch.jpg"/>
+          <img class="product-image" :src="getImage(selectedProduct.name)"/>
         </div>
         <div class="description-wrapper">
-          <label class="name">Name</label>
-          <label class="cost">Cost</label>
-          <div class="qauntity-selection"> 
-            <label>Quantity</label>
-            <input id="quantity-input"/>
+
+          <div class="name-wrapper"> 
+            <label>Name: </label>
+            <label class="name">{{ selectedProduct.name }}</label>
           </div>
-          <el-button type="primary">Add to cart</el-button>
+
+          <div class="cost-wrapper"> 
+            <label >Cost: </label>
+            <label class="cost">{{ selectedProduct.cost }}</label>
+          </div>
+
+          <div class="quantity-wrapper"> 
+            <label>Quantity</label>
+            <input v-model.number="quantity" class="quantity-input" @change="handleQuantityChange(quantity)"/>
+          </div>
+
+          <el-button type="primary" @click="addToCart">Add to cart</el-button>
         </div>
       </section>
 
     </el-main>
     <el-footer></el-footer>
+
   </el-container>
 </template>
 
-<script lang="ts" setup>
-import { ElMessage } from 'element-plus'
+<script setup>
+import { ref } from 'vue'
+import { ElMessage, ElDialog } from 'element-plus'
 import { ArrowDown, ShoppingCart } from '@element-plus/icons-vue'
 
-const handleCommand = (command: string | number | object) => {
-  ElMessage(`click on item ${command}`)
+const selectedCategory = ref('')
+const selectedProduct = ref(null)
+const products = ref({
+  wood: [
+    { name: 'oak', cost: 800 },
+    { name: 'birch', cost: 1500 },
+    { name: 'spruce', cost: 1000 }
+  ],
+  metal: [
+    { name: 'iron', cost: 2800 },
+    { name: 'gold', cost: 5000 }
+  ]
+})
+
+const images = ref({
+  oak: '/src/assets/oak.png',
+  birch: '/src/assets/birch.png',
+  spruce: '/src/assets/spruce.png',
+  iron: '/src/assets/iron.png',
+  gold: '/src/assets/gold.png',
+})
+
+const cartItems = ref([])
+const totalCost = ref(0)
+const cartVisible = ref(false)
+const quantity = ref(1)
+
+const updateProducts = () => {
+  if (selectedCategory.value && products.value[selectedCategory.value]) {
+    selectedProduct.value = null
+  }
+}
+
+const addToCart = () => {
+  if (selectedProduct.value && quantity.value) {
+    const existingItem = cartItems.value.find(item => item.name === selectedProduct.value.name);
+    const cost = calculateCost(selectedProduct.value.cost, quantity.value);
+    if (existingItem) {
+      existingItem.quantity += quantity.value;
+      existingItem.cost += cost;
+    } else {
+      cartItems.value.push({ name: selectedProduct.value.name, quantity: quantity.value, cost: cost });
+    }
+    totalCost.value += cost;
+  } else {
+    ElMessage.error('Please select a product and enter quantity');
+  }
+}
+
+const calculateCost = (cost, quantity) => {
+  return cost * quantity
+}
+
+const handleQuantityChange = (value) => {
+  if (value <= 0) {
+    quantity.value = 1
+  }
+}
+
+const openCart = () => {
+  console.log('Opening cart...')
+  cartVisible.value = true
+}
+
+const closeCart = () => {
+  console.log('Closing cart...')
+  cartVisible.value = false
+}
+
+const getImage = (productName) => {
+  return images.value[productName] || '';
+}
+
+const handleCategoryChange = (category) => {
+  selectedCategory.value = category
+  selectedProduct.value = null
 }
 </script>
+
 
 <style scoped>
 
 .calc-header {
   background-color: #303030;
-  width: 100vh;
+  min-width: 100vh;
   display: flex;
   justify-content: space-between;
   place-items: center;
@@ -133,23 +240,37 @@ const handleCommand = (command: string | number | object) => {
   flex-direction: column;
   gap: 10px;
   color: #909090;
+  width: 200px;
   font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
 }
 
-.qauntity-selection {
-  margin-bottom: 15px;
+.name-wrapper, .cost-wrapper {
   display: flex;
-  flex-direction: row;
+  justify-content: space-between;
   place-items: center;
-  gap: 15px;
 }
 
-#quantity-input {
+.name, .cost {
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  margin-left: 100px;
+}
+
+.quantity-wrapper {
+  margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  place-items: center;
+}
+
+.quantity-input {
   background-color: #202020;
   border-radius: 10px;
   color: #909090;
   padding-left: 10px;
   border: none;
+  max-width: 40px;
 }
 
 .product-image {
@@ -163,7 +284,24 @@ const handleCommand = (command: string | number | object) => {
   background-color: #202020;
   display: flex;
   align-items: center;
+  border:none;
   font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+.dropdown-link :hover {
+  cursor: pointer;
+}
+
+.el-dropdown:focus-visible {
+  border:none;
+  outline: none;
+  box-shadow: none;
+}
+
+.dropdown-link:focus-visible {
+  border:none;
+  outline: none;
+  box-shadow: none;
 }
 
 .dropdown-menu{
@@ -172,5 +310,85 @@ const handleCommand = (command: string | number | object) => {
   display: flex;
   flex-direction: column;
   font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-dropdown-menu__item:hover) {
+  background-color: #303030;
+  color: #fff;
+}
+
+:deep(.el-dialog) {
+  background-color: #404040;
+  border-radius: 15px;
+  font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-dialog .el-table) {
+  background-color: #404040;
+  border: none;
+  --el-table-border-color: #808080; 
+  font: 600 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-table .el-table__cell) {
+  color: #909090;
+  background-color: #404040;
+  border: none;
+  font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-dialog) {
+  background-color: #404040;
+  border-radius: 15px;
+  font: 400 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-dialog .el-dialog__title) {
+  color: #959595;
+  font: 600 24px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-table--enable-row-hover .el-table__body tr:hover>td.el-table__cell) {
+  background-color: #282828;
+}
+
+.total-cost {
+  justify-content: right;
+  display: flex;
+  margin-top: 20px;
+  color: #fff;
+  font: 400 16px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+.empty-cart {
+  justify-content: center;
+  display: flex;
+  margin: 30px 0px;
+  color: #fff;
+  font: 400 24px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-button) {
+  background-color: #606060;
+  border-color: #454545;
+  color: #000;
+  outline: none;
+  font: 600 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-button--primary) {
+  background-color: #71d1b1;
+  border-color: #549982;
+  color: #000;
+  outline: none;
+  font: 600 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
+}
+
+:deep(.el-button:active) {
+  background-color: #2b2a2a;
+  border-color: #454545;
+  color: #000;
+  outline: none;
+  font: 600 14px Montserrat Alternates, -apple-system, Roboto, Helvetica, sans-serif;
 }
 </style>
