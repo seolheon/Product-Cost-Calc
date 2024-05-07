@@ -8,24 +8,24 @@
       <el-button type="primary" :icon="ShoppingCart" @click="openCart" /> 
       <el-dialog v-model="cartVisible" title="Cart" width="500" center>
 
-        <el-table v-show="cartItems.length > 0" :data="cartItems" border>
+        <el-table v-show="cartItems.length" :data="cartItems" border>
           <el-table-column prop="name" label="Product Name"></el-table-column>
           <el-table-column prop="quantity" label="Quantity"></el-table-column>
           <el-table-column prop="cost" label="Cost"></el-table-column>
         </el-table>
 
-        <div v-show="cartItems.length > 0" class="total-cost">
+        <div v-show="cartItems.length" class="total-cost">
           Total Cost: {{ totalCost }}
         </div>
 
-        <div v-show="!(cartItems.length > 0)" class="empty-cart">
+        <div v-show="!cartItems.length" class="empty-cart">
           Cart is empty
         </div>
 
         <template #footer>
           <div class="dialog-footer">
             <el-button @click="closeCart">Cancel</el-button>
-            <el-button v-show="cartItems.length > 0" type="primary" @click="closeCart">
+            <el-button v-show="cartItems.length" type="primary" @click="closeCart">
               Order
             </el-button>
           </div>
