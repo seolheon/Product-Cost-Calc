@@ -38,20 +38,20 @@
 
       <section class="dropdown-section">
         <div class="dropdown-wrapper">
-          <el-dropdown @command="handleCategoryChange">
-            <span class="dropdown-link">
-              <label v-if="!selectedCategory" class="c-label">Choose category</label>
-              <label v-else class="c-label">{{selectedCategory}}</label>
-              <el-icon class="el-icon--right"><arrow-down /></el-icon>
-            </span>
-            <template #dropdown>
+            <el-dropdown @command="handleCategoryChange">
+          <span class="dropdown-link">
+            <label v-if="!selectedCategory" class="c-label">Choose category</label>
+            <label v-else class="c-label">{{selectedCategory}}</label>
+            <el-icon class="el-icon--right"><arrow-down /></el-icon>
+          </span>
+          <template #dropdown>
             <el-dropdown-menu class="dropdown-menu">
-              <el-dropdown-item v-for="(category, index) in Object.keys(products)" :key="index" :command="category">{{ category }}</el-dropdown-item>
+              <el-dropdown-item v-if="!categories.length" disabled=true class="c-label">No categories available</el-dropdown-item>
+              <el-dropdown-item v-else v-for="(category, index) in categories" :key="index" :command="category.name">{{ category.name }}</el-dropdown-item>
             </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>   
-
+          </template>
+        </el-dropdown>
+      
         <div v-if="selectedCategory" class="dropdown-wrapper">
           <el-dropdown @command="selectedProduct = $event">
             <span class="dropdown-link">
@@ -60,17 +60,19 @@
               <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
-            <el-dropdown-menu class="dropdown-menu">
-              <el-dropdown-item v-for="product in products[selectedCategory]" :key="product.name" :command="product">{{ product.name }}</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
+              <el-dropdown-menu class="dropdown-menu">
+                <el-dropdown-item v-if="!products.length" disabled=true class="c-label">No products available</el-dropdown-item>
+                <el-dropdown-item v-else v-for="product in products" :key="product.name" :command="product">{{ product.name }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
           </el-dropdown>
         </div>  
-      </section>
-    
+      </div>
+    </section>
+          
       <section class="product-details" v-if="selectedProduct">
         <div class="image-wrapper">
-          <img class="product-image" :src="getImage(selectedProduct.name)"/>
+          <img class="product-image" :src="selectedProduct.image"/>
         </div>
         <div class="description-wrapper">
 
@@ -100,47 +102,44 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { ElMessage, ElDialog } from 'element-plus'
-import { ArrowDown, ShoppingCart } from '@element-plus/icons-vue'
+import { ref, watch, onMounted } from 'vue';
+import axios from 'axios';
+import { ElMessage } from 'element-plus';
+import { ArrowDown, ShoppingCart } from '@element-plus/icons-vue';
 
-const selectedCategory = ref('')
-const selectedProduct = ref(null)
-const products = ref({
-  wood: [
-    { name: 'oak', cost: 800 },
-    { name: 'birch', cost: 1500 },
-    { name: 'spruce', cost: 1000 }
-  ],
-  metal: [
-    { name: 'iron', cost: 2800 },
-    { name: 'gold', cost: 5000 }
-  ]
-})
+const selectedCategory = ref('');
+const selectedProduct = ref(null);
+const categories = ref([]);
+const products = ref([]);
+const cartItems = ref([]);
+const totalCost = ref(0);
+const cartVisible = ref(false);
+const quantity = ref(1);
 
-const images = ref({
-  oak: '/src/assets/oak.png',
-  birch: '/src/assets/birch.png',
-  spruce: '/src/assets/spruce.png',
-  iron: '/src/assets/iron.png',
-  gold: '/src/assets/gold.png',
-})
-
-const cartItems = ref([])
-const totalCost = ref(0)
-const cartVisible = ref(false)
-const quantity = ref(1)
-
-const updateProducts = () => {
-  if (selectedCategory.value && products.value[selectedCategory.value]) {
-    selectedProduct.value = null
+const loadCategories = async () => {
+  try {
+    const url = '/api/categories';
+    const response = await axios.get(url);
+    categories.value = response.data; 
+  } catch (error) {
+    console.error('Error loading categories:', error);
   }
-}
+};
+
+const loadProducts = async (categoryName) => {
+  try {
+    const url = `/api/products/${categoryName}/`;
+    const response = await axios.get(url);
+    products.value = response.data; 
+  } catch (error) {
+    console.error('Error loading products:', error);
+  }
+};
 
 const addToCart = () => {
   if (selectedProduct.value && quantity.value) {
     const existingItem = cartItems.value.find(item => item.name === selectedProduct.value.name);
-    const cost = calculateCost(selectedProduct.value.cost, quantity.value);
+    const cost = calculateCost(selectedProduct.value.cost, quantity.value); 
     if (existingItem) {
       existingItem.quantity += quantity.value;
       existingItem.cost += cost;
@@ -151,38 +150,43 @@ const addToCart = () => {
   } else {
     ElMessage.error('Please select a product and enter quantity');
   }
-}
+};
 
 const calculateCost = (cost, quantity) => {
-  return cost * quantity
-}
+  return cost * quantity; 
+};
 
 const handleQuantityChange = (value) => {
   if (value <= 0) {
-    quantity.value = 1
+    quantity.value = 1;
   }
-}
+};
 
 const openCart = () => {
-  console.log('Opening cart...')
-  cartVisible.value = true
-}
+  console.log('Opening cart...');
+  cartVisible.value = true;
+};
 
 const closeCart = () => {
-  console.log('Closing cart...')
-  cartVisible.value = false
-}
-
-const getImage = (productName) => {
-  return images.value[productName] || '';
-}
+  console.log('Closing cart...');
+  cartVisible.value = false;
+};
 
 const handleCategoryChange = (category) => {
-  selectedCategory.value = category
-  selectedProduct.value = null
-}
-</script>
+  selectedCategory.value = category;
+  selectedProduct.value = null;
+};
 
+onMounted(async () => {
+  await loadCategories(); 
+});
+
+watch(selectedCategory, async (newValue) => {
+  if (newValue) {
+    await loadProducts(newValue); 
+  }
+});
+</script>
 
 <style scoped>
 
